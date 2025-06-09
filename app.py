@@ -42,7 +42,7 @@ def preprocess_image(image_path):
 def extract_features(model, image_path):
     img = preprocess_image(image_path)
     features = model.predict(img, verbose=0)
-    return features
+    return features[0]
 
 # Your greedy_generator
 def greedy_generator(image_features):
