@@ -67,6 +67,7 @@ st.title("🖼️ Image Caption Generator (Greedy Search)")
 uploaded_file = st.file_uploader("Upload an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
+    print(uploaded_file)
     image = Image.open(uploaded_file)
     st.image(image, caption="Uploaded Image", use_column_width=True)
 
