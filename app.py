@@ -18,7 +18,9 @@ def load_caption_model():
 
 def load_feature_extractor():
     base_model = InceptionV3(weights='imagenet', include_top=False, input_shape=(299, 299, 3))
-    return Model(inputs=base_model.input, outputs=tf.keras.layers.GlobalAveragePooling2D()(base_model.output))
+    gap_layer = tf.keras.layers.GlobalAveragePooling2D(name='global_average_pooling')(base_model.output)
+    return Model(inputs=base_model.input, outputs=gap_layer)
+
 
 tokenizer = load_tokenizer()
 caption_model = load_caption_model()
