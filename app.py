@@ -34,7 +34,7 @@ cnn_output_dim = 2048    # for InceptionV3's GlobalAveragePooling2D output
 
 def preprocess_image(image):
     # image is a PIL Image object
-    img = image.resize((299, 299))
+    img = image.resize((299, 299)).convert('RGB')
     img_array = img_to_array(img)
     img_array = np.expand_dims(img_array, axis=0)
     img_array = preprocess_input(img_array)
