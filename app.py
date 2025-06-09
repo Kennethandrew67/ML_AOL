@@ -14,7 +14,7 @@ cnn_output_dim = 2048    # Update if you use a different CNN
 # --- Load model & tokenizer ---
 @st.cache(allow_output_mutation=True)
 def load_model_and_tokenizer():
-    model = tf.keras.models.load_model("caption_model.h5")
+    model = tf.keras.models.load_model("caption_model.h5", compile=False)
     with open("image_features.pkl", "rb") as f:
         tokenizer = pickle.load(f)
     return model, tokenizer
