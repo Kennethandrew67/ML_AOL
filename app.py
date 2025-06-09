@@ -12,7 +12,7 @@ mobilenet_model = MobileNetV2(weights="imagenet")
 mobilenet_model = Model(inputs=mobilenet_model.inputs, outputs=mobilenet_model.layers[-2].output)
 
 # Load your trained model
-model = tf.keras.models.load_model('caption_model.h5')
+model = tf.keras.models.load_model('caption_model.h5', compile=False)
 
 # Load the tokenizer
 with open('tokenizer.pkl', 'rb') as tokenizer_file:
