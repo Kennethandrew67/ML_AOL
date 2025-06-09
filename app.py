@@ -39,7 +39,7 @@ def preprocess_image(image_path):
     img = preprocess_input(img)
     return img
 
-def extract_image_features(model, image_path):
+def extract_features(model, image_path):
     img = preprocess_image(image_path)
     features = model.predict(img, verbose=0)
     return features
