@@ -14,7 +14,7 @@ max_caption_length = 35  # Set this to your actual value
 cnn_output_dim = 2048    # Update if you use a different CNN
 
 # --- Load model & tokenizer ---
-@st.cache_resource
+
 def load_model_and_tokenizer():
     model = tf.keras.models.load_model("caption_model.h5", compile=False)
     with open("image_features.pkl", "rb") as f:
@@ -22,7 +22,7 @@ def load_model_and_tokenizer():
     return model, tokenizer
 
 # --- Load feature extractor (InceptionV3) ---
-@st.cache_resource
+
 def load_feature_extractor():
     base_model = InceptionV3(weights="imagenet")
     model = Model(inputs=base_model.input, outputs=base_model.layers[-2].output)
