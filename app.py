@@ -1,84 +1,85 @@
 import streamlit as st
 import numpy as np
 import pickle
-from PIL import Image
 import tensorflow as tf
-from tensorflow.keras.models import load_model, Model
-from tensorflow.keras.applications.inception_v3 import InceptionV3, preprocess_input
-from tensorflow.keras.preprocessing.image import img_to_array
+from tensorflow.keras.models import Model
+from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2, preprocess_input
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-# Constants
-MAX_CAPTION_LENGTH = 38
-CNN_OUTPUT_DIM = 2048
+# Load MobileNetV2 model
+mobilenet_model = MobileNetV2(weights="imagenet")
+mobilenet_model = Model(inputs=mobilenet_model.inputs, outputs=mobilenet_model.layers[-2].output)
 
-# Load tokenizer
+# Load your trained model
+model = tf.keras.models.load_model('mymodel.h5')
 
-def load_tokenizer():
-    with open('tokenizer.pkl', 'rb') as f:
-        return pickle.load(f)
-
-# Load caption generation model
-
-def load_caption_model():
-    return load_model('caption_model.h5', compile=False)
-
-# Load image feature extractor (InceptionV3 with GAP layer)
-
-def load_feature_extractor():
-    base_model = InceptionV3(weights='imagenet', include_top=False, input_shape=(299, 299, 3))
-    gap_layer = tf.keras.layers.GlobalAveragePooling2D(name='global_average_pooling')(base_model.output)
-    return Model(inputs=base_model.input, outputs=gap_layer)
-
-# Preprocess image
-def preprocess_image_from_pil(pil_image):
-    img = pil_image.resize((299, 299)).convert('RGB')
-    img = img_to_array(img)
-    img = np.expand_dims(img, axis=0)
-    img = preprocess_input(img)
-    return img
-
-# Extract features from image
-def extract_image_features_from_pil(model, pil_image):
-    img = preprocess_image_from_pil(pil_image)
-    features = model.predict(img, verbose=0)
-    return features[0]
-
-# Generate caption using greedy search
-def greedy_generator(model, tokenizer, image_features):
-    in_text = 'start'
-    for _ in range(MAX_CAPTION_LENGTH):
-        sequence = tokenizer.texts_to_sequences([in_text])[0]
-        sequence = pad_sequences([sequence], maxlen=MAX_CAPTION_LENGTH)
-        prediction = model.predict([np.expand_dims(image_features, axis=0), sequence], verbose=0)
-        idx = np.argmax(prediction)
-        word = tokenizer.index_word.get(idx)
-        if word is None:
-            break
-        in_text += ' ' + word
-        if word == 'end':
-            break
-    return in_text.replace('start ', '').replace(' end', '').strip()
-
-# Load models
-tokenizer = load_tokenizer()
-caption_model = load_caption_model()
-feature_extractor = load_feature_extractor()
-
-# Streamlit UI
+# Load the tokenizer
+with open('tokenizer.pkl', 'rb') as tokenizer_file:
+    tokenizer = pickle.load(tokenizer_file)
+    
+# Set custom web page title
 st.set_page_config(page_title="Caption Generator App", page_icon="📷")
-st.title("🖼️ Image Caption Generator (Greedy Search)")
-st.markdown("Upload an image and get a generated caption using a trained LSTM model with InceptionV3 features.")
 
-uploaded_file = st.file_uploader("Upload an image...", type=["jpg", "jpeg", "png"])
+# Streamlit app
+st.title("Image Caption Generator")
+st.markdown(
+    "Upload an image, and this app will generate a caption for it using a trained LSTM model."
+)
 
-if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Image", use_column_width=True)
+# Upload image
+uploaded_image = st.file_uploader("Choose an image", type=["jpg", "jpeg", "png"])
 
+# Process uploaded image
+if uploaded_image is not None:
+    st.subheader("Uploaded Image")
+    st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
+
+    st.subheader("Generated Caption")
+    # Display loading spinner while processing
     with st.spinner("Generating caption..."):
-        features = extract_image_features_from_pil(feature_extractor, image)
-        caption = greedy_generator(caption_model, tokenizer, features)
+        # Load image
+        image = load_img(uploaded_image, target_size=(224, 224))
+        image = img_to_array(image)
+        image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
+        image = preprocess_input(image)
 
-    st.success("Generated Caption:")
-    st.markdown(f"**{caption}**")
+        # Extract features using VGG16
+        image_features = mobilenet_model.predict(image, verbose=0)
+
+        # Max caption length
+        max_caption_length = 34
+        
+        # Define function to get word from index
+        def get_word_from_index(index, tokenizer):
+            return next(
+                (word for word, idx in tokenizer.word_index.items() if idx == index), None
+        )
+
+        # Generate caption using the model
+        def predict_caption(model, image_features, tokenizer, max_caption_length):
+            caption = "startseq"
+            for _ in range(max_caption_length):
+                sequence = tokenizer.texts_to_sequences([caption])[0]
+                sequence = pad_sequences([sequence], maxlen=max_caption_length)
+                yhat = model.predict([image_features, sequence], verbose=0)
+                predicted_index = np.argmax(yhat)
+                predicted_word = get_word_from_index(predicted_index, tokenizer)
+                caption += " " + predicted_word
+                if predicted_word is None or predicted_word == "endseq":
+                    break
+            return caption
+
+        # Generate caption
+        generated_caption = predict_caption(model, image_features, tokenizer, max_caption_length)
+
+        # Remove startseq and endseq
+        generated_caption = generated_caption.replace("startseq", "").replace("endseq", "")
+
+    # Display the generated caption with custom styling
+    st.markdown(
+        f'<div style="border-left: 6px solid #ccc; padding: 5px 20px; margin-top: 20px;">'
+        f'<p style="font-style: italic;">“{generated_caption}”</p>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
