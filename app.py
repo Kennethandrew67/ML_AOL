@@ -17,7 +17,7 @@ def load_tokenizer():
 
 
 def load_caption_model():
-    return load_model('caption_model.h5')
+    return load_model('caption_model.h5', compile=False)
 
 
 def load_feature_extractor():
