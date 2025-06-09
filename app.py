@@ -5,7 +5,7 @@ from PIL import Image
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.inception_v3 import InceptionV3, preprocess_input
-from tensorflow.keras.preprocessing.image import img_to_array
+from tensorflow.keras.preprocessing.image import img_to_array, load_img
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Model
 
@@ -32,16 +32,17 @@ feature_extractor = load_feature_extractor()
 max_caption_length = 38  # or your actual max length used during training
 cnn_output_dim = 2048    # for InceptionV3's GlobalAveragePooling2D output
 
-def preprocess_image(image):
-    img = image.resize((299, 299)).convert('RGB')
-    img_array = img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    img_array = preprocess_input(img_array)
-    return img_array
+def preprocess_image(image_path):
+    img = load_img(image_path, target_size=(299, 299))
+    img = img_to_array(img)
+    img = np.expand_dims(img, axis=0)
+    img = preprocess_input(img)
+    return img
 
-def extract_features(image, model):
-    img = preprocess_image(image)
-    return model.predict(img)[0]  # shape: (2048,)
+def extract_image_features(model, image_path):
+    img = preprocess_image(image_path)
+    features = model.predict(img, verbose=0)
+    return features
 
 # Your greedy_generator
 def greedy_generator(image_features):
