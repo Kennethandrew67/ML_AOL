@@ -49,16 +49,17 @@ def greedy_generator(image_features):
     in_text = 'start '
     for _ in range(max_caption_length):
         sequence = tokenizer.texts_to_sequences([in_text])[0]
-        sequence = pad_sequences([sequence], maxlen=max_caption_length).reshape((1, max_caption_length))
-        prediction = caption_model.predict([image_features.reshape(1, cnn_output_dim), sequence], verbose=0)
+        sequence = pad_sequences([sequence], maxlen=max_caption_length).reshape((1,max_caption_length))
+        prediction = caption_model.predict([image_features.reshape(1,cnn_output_dim), sequence], verbose=0)
         idx = np.argmax(prediction)
-        word = tokenizer.index_word.get(idx)
-        if word is None:
-            break
-        in_text += word + ' '
+        word = tokenizer.index_word[idx]
+        in_text += ' ' + word
         if word == 'end':
             break
-    in_text = in_text.replace('start ', '').replace(' end', '').strip()
+
+    in_text = in_text.replace('start ', '')
+    in_text = in_text.replace(' end', '')
+
     return in_text
 
 # Streamlit UI
