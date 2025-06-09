@@ -71,8 +71,7 @@ if uploaded_image is not None:
         generated_caption = predict_caption(model, image_features, tokenizer, max_caption_length)
 
     st.markdown(
-        f'<div style="border-left: 6px solid #ccc; padding: 5px 20px; margin-top: 20px;">'
-        f'<p style="font-style: italic;">“{generated_caption}”</p>'
-        f'</div>',
+        f'{generated_caption}'
+       
         unsafe_allow_html=True
     )
