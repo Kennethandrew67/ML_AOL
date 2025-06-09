@@ -70,8 +70,4 @@ if uploaded_image is not None:
         # Generate caption
         generated_caption = predict_caption(model, image_features, tokenizer, max_caption_length)
 
-    st.markdown(
-        f'{generated_caption}'
-       
-        unsafe_allow_html=True
-    )
+        st.markdown(f"**{generated_caption}**")
