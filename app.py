@@ -7,13 +7,14 @@ from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from tensorflow.keras.applications.inception_v3 import InceptionV3, preprocess_input
 from tensorflow.keras.models import Model
 from io import BytesIO
+from PIL import Image
 
 # --- Config ---
 max_caption_length = 35  # Set this to your actual value
 cnn_output_dim = 2048    # Update if you use a different CNN
 
 # --- Load model & tokenizer ---
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def load_model_and_tokenizer():
     model = tf.keras.models.load_model("caption_model.h5", compile=False)
     with open("image_features.pkl", "rb") as f:
@@ -21,20 +22,35 @@ def load_model_and_tokenizer():
     return model, tokenizer
 
 # --- Load feature extractor (InceptionV3) ---
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def load_feature_extractor():
     base_model = InceptionV3(weights="imagenet")
     model = Model(inputs=base_model.input, outputs=base_model.layers[-2].output)
     return model
 
 # --- Preprocess image and extract features ---
-def extract_features(image, feature_extractor):
-    image = image.resize((299, 299))
-    image = img_to_array(image)
-    image = np.expand_dims(image, axis=0)
-    image = preprocess_input(image)
-    features = feature_extractor.predict(image)
-    return features.reshape(1, cnn_output_dim)
+def preprocess_image_from_bytes(image_bytes):
+    """Preprocess image from bytes"""
+    img = Image.open(BytesIO(image_bytes))
+    img = img.convert('RGB')  # Ensure RGB format
+    img = img.resize((299, 299))  # Resize to InceptionV3 input size
+    img = img_to_array(img)
+    img = np.expand_dims(img, axis=0)
+    img = preprocess_input(img)
+    return img
+
+def preprocess_image(image_path):
+    """Preprocess image from file path"""
+    img = load_img(image_path, target_size=(299, 299))
+    img = img_to_array(img)
+    img = np.expand_dims(img, axis=0)
+    img = preprocess_input(img)
+    return img
+
+def extract_image_features(model, image_array):
+    """Extract features from preprocessed image array"""
+    features = model.predict(image_array, verbose=0)
+    return features
 
 # --- Caption generation using greedy search ---
 def greedy_generator(image_features, tokenizer, model):
@@ -64,14 +80,22 @@ if uploaded_file is not None:
     st.image(uploaded_file, use_column_width=True, caption="Uploaded Image")
 
     with st.spinner("Generating caption..."):
-        model, tokenizer = load_model_and_tokenizer()
-        feature_extractor = load_feature_extractor()
+        try:
+            # Load models
+            model, tokenizer = load_model_and_tokenizer()
+            feature_extractor = load_feature_extractor()
 
-        from io import BytesIO
-        image = load_img(BytesIO(uploaded_file.read()), target_size=(299, 299))  # Add target_size if required
-        image_features = extract_features(image, feature_extractor)
-
-        caption = greedy_generator(image_features, tokenizer, model)
-        st.success("Generated Caption:")
-        st.write(caption)
-
+            # Process the uploaded image
+            image_bytes = uploaded_file.read()
+            preprocessed_image = preprocess_image_from_bytes(image_bytes)
+            image_features = extract_image_features(feature_extractor, preprocessed_image)
+            
+            # Generate caption
+            caption = greedy_generator(image_features, tokenizer, model)
+            
+            st.success("Generated Caption:")
+            st.write(f"**{caption}**")
+            
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+            st.error("Please make sure your model files ('caption_model.h5' and 'image_features.pkl') are in the correct location.")
