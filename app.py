@@ -1,101 +1,76 @@
 import streamlit as st
 import numpy as np
-import tensorflow as tf
 import pickle
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
-from tensorflow.keras.applications.inception_v3 import InceptionV3, preprocess_input
-from tensorflow.keras.models import Model
-from io import BytesIO
 from PIL import Image
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow.keras.applications.inception_v3 import InceptionV3, preprocess_input
+from tensorflow.keras.preprocessing.image import img_to_array
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Model
 
-# --- Config ---
-max_caption_length = 35  # Set this to your actual value
-cnn_output_dim = 2048    # Update if you use a different CNN
+# Load tokenizer and model
+@st.cache_resource
+def load_tokenizer():
+    with open('tokenizer.pkl', 'rb') as f:
+        return pickle.load(f)
 
-# --- Load model & tokenizer ---
+@st.cache_resource
+def load_caption_model():
+    return load_model('caption_model.h5')
 
-def load_model_and_tokenizer():
-    model = tf.keras.models.load_model("caption_model.h5", compile=False)
-    with open("image_features.pkl", "rb") as f:
-        tokenizer = pickle.load(f)
-    return model, tokenizer
-
-# --- Load feature extractor (InceptionV3) ---
-
+@st.cache_resource
 def load_feature_extractor():
-    base_model = InceptionV3(weights="imagenet")
-    model = Model(inputs=base_model.input, outputs=base_model.layers[-2].output)
-    return model
+    base_model = InceptionV3(weights='imagenet', include_top=False, input_shape=(299, 299, 3))
+    return Model(inputs=base_model.input, outputs=tf.keras.layers.GlobalAveragePooling2D()(base_model.output))
 
-# --- Preprocess image and extract features ---
-def preprocess_image_from_bytes(image_bytes):
-    """Preprocess image from bytes"""
-    img = Image.open(BytesIO(image_bytes))
-    img = img.convert('RGB')  # Ensure RGB format
-    img = img.resize((299, 299))  # Resize to InceptionV3 input size
-    img = img_to_array(img)
-    img = np.expand_dims(img, axis=0)
-    img = preprocess_input(img)
-    return img
+tokenizer = load_tokenizer()
+caption_model = load_caption_model()
+feature_extractor = load_feature_extractor()
 
-def preprocess_image(image_path):
-    """Preprocess image from file path"""
-    img = load_img(image_path, target_size=(299, 299))
-    img = img_to_array(img)
-    img = np.expand_dims(img, axis=0)
-    img = preprocess_input(img)
-    return img
+# Set constants
+max_caption_length = 35  # or your actual max length used during training
+cnn_output_dim = 2048    # for InceptionV3's GlobalAveragePooling2D output
 
-def extract_image_features(model, image_array):
-    """Extract features from preprocessed image array"""
-    features = model.predict(image_array, verbose=0)
-    return features
+def preprocess_image(image):
+    img = image.resize((299, 299)).convert('RGB')
+    img_array = img_to_array(img)
+    img_array = np.expand_dims(img_array, axis=0)
+    img_array = preprocess_input(img_array)
+    return img_array
 
-# --- Caption generation using greedy search ---
-def greedy_generator(image_features, tokenizer, model):
+def extract_features(image, model):
+    img = preprocess_image(image)
+    return model.predict(img)[0]  # shape: (2048,)
+
+# Your greedy_generator
+def greedy_generator(image_features):
     in_text = 'start '
     for _ in range(max_caption_length):
         sequence = tokenizer.texts_to_sequences([in_text])[0]
         sequence = pad_sequences([sequence], maxlen=max_caption_length).reshape((1, max_caption_length))
-        prediction = model.predict([image_features, sequence], verbose=0)
+        prediction = caption_model.predict([image_features.reshape(1, cnn_output_dim), sequence], verbose=0)
         idx = np.argmax(prediction)
         word = tokenizer.index_word.get(idx)
         if word is None:
             break
-        in_text += ' ' + word
+        in_text += word + ' '
         if word == 'end':
             break
-    in_text = in_text.replace('start ', '').replace(' end', '')
+    in_text = in_text.replace('start ', '').replace(' end', '').strip()
     return in_text
 
-# --- Streamlit UI ---
-st.set_page_config(page_title="Image Captioning App", layout="centered")
+# Streamlit UI
 st.title("🖼️ Image Caption Generator (Greedy Search)")
-st.markdown("Upload an image and generate a caption using a pre-trained image captioning model.")
-
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
+uploaded_file = st.file_uploader("Upload an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    st.image(uploaded_file, use_column_width=True, caption="Uploaded Image")
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    with st.spinner("Generating caption..."):
-        try:
-            # Load models
-            model, tokenizer = load_model_and_tokenizer()
-            feature_extractor = load_feature_extractor()
+    with st.spinner('Generating caption...'):
+        features = extract_features(image, feature_extractor)
+        caption = greedy_generator(features)
 
-            # Process the uploaded image
-            image_bytes = uploaded_file.read()
-            preprocessed_image = preprocess_image_from_bytes(image_bytes)
-            image_features = extract_image_features(feature_extractor, preprocessed_image)
-            
-            # Generate caption
-            caption = greedy_generator(image_features, tokenizer, model)
-            
-            st.success("Generated Caption:")
-            st.write(f"**{caption}**")
-            
-        except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
-            st.error("Please make sure your model files ('caption_model.h5' and 'image_features.pkl') are in the correct location.")
+    st.success("Generated Caption:")
+    st.markdown(f"**{caption}**")
