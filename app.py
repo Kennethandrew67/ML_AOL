@@ -29,7 +29,7 @@ caption_model = load_caption_model()
 feature_extractor = load_feature_extractor()
 
 # Set constants
-max_caption_length = 35  # or your actual max length used during training
+max_caption_length = 38  # or your actual max length used during training
 cnn_output_dim = 2048    # for InceptionV3's GlobalAveragePooling2D output
 
 def preprocess_image(image):
