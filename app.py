@@ -6,6 +6,7 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from tensorflow.keras.applications.inception_v3 import InceptionV3, preprocess_input
 from tensorflow.keras.models import Model
+from io import BytesIO
 
 # --- Config ---
 max_caption_length = 35  # Set this to your actual value
@@ -57,7 +58,7 @@ st.set_page_config(page_title="Image Captioning App", layout="centered")
 st.title("🖼️ Image Caption Generator (Greedy Search)")
 st.markdown("Upload an image and generate a caption using a pre-trained image captioning model.")
 
-uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
     st.image(uploaded_file, use_column_width=True, caption="Uploaded Image")
@@ -66,10 +67,11 @@ if uploaded_file is not None:
         model, tokenizer = load_model_and_tokenizer()
         feature_extractor = load_feature_extractor()
 
-        image = load_img(uploaded_file)
+        from io import BytesIO
+        image = load_img(BytesIO(uploaded_file.read()), target_size=(299, 299))  # Add target_size if required
         image_features = extract_features(image, feature_extractor)
 
         caption = greedy_generator(image_features, tokenizer, model)
-
-        st.subheader("📝 Generated Caption:")
+        st.success("Generated Caption:")
         st.write(caption)
+
