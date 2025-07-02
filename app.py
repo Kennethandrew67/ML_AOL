@@ -8,18 +8,16 @@ from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2, preprocess_i
 from tensorflow.keras.preprocessing.image import img_to_array
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-# Load MobileNetV2 model
+
 mobilenet_model = MobileNetV2(weights="imagenet")
 mobilenet_model = Model(inputs=mobilenet_model.inputs, outputs=mobilenet_model.layers[-2].output)
 
-# Load your trained model
 model = tf.keras.models.load_model('caption_model.h5', compile=False)
 
 # Load the tokenizer
 with open('tokenizer.pkl', 'rb') as tokenizer_file:
     tokenizer = pickle.load(tokenizer_file)
 
-# Max caption length
 max_caption_length = 34
 
 # Set custom web page title
