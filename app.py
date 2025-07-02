@@ -7,10 +7,16 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2, preprocess_input
 from tensorflow.keras.preprocessing.image import img_to_array
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.applications import InceptionV3
+from tensorflow.keras.layers import GlobalAveragePooling2D
 
+# Load InceptionV3 base model without top
+base_model = InceptionV3(weights='imagenet', include_top=False, input_shape=(299, 299, 3))
 
-mobilenet_model = MobileNetV2(weights="imagenet")
-mobilenet_model = Model(inputs=mobilenet_model.inputs, outputs=mobilenet_model.layers[-2].output)
+# Add GlobalAveragePooling2D layer on top
+x = GlobalAveragePooling2D()(base_model.output)
+inception_model = Model(inputs=base_model.input, outputs=x)
+
 
 model = tf.keras.models.load_model('caption_model.h5', compile=False)
 
@@ -56,6 +62,8 @@ if uploaded_image is not None:
 
     st.subheader("Generated Caption")
     with st.spinner("Generating caption..."):
+        mobilenet_model = MobileNetV2(weights="imagenet")
+        mobilenet_model = Model(inputs=mobilenet_model.inputs, outputs=mobilenet_model.layers[-2].output)
         # Load and preprocess image using PIL
         image = Image.open(uploaded_image).resize((224, 224)).convert('RGB')
         image = img_to_array(image)
