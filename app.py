@@ -10,8 +10,10 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 
 # Load InceptionV3 model pre-trained on ImageNet, exclude top classification layer
-inception_model = InceptionV3(weights='imagenet')
-inception_model = Model(inputs=inception_model.input, outputs=inception_model.get_layer('avg_pool').output)
+inception_model = InceptionV3(weights='imagenet', include_top=False, input_shape=(299, 299, 3))
+inception_model = Model(inputs=inception_model, outputs=tf.keras.layers.GlobalAveragePooling2D()(inception_model.output))
+
+cnn_output_dim = 2048
 
 
 model = tf.keras.models.load_model('caption_model.h5', compile=False)
@@ -36,20 +38,21 @@ uploaded_image = st.file_uploader("Choose an image", type=["jpg", "jpeg", "png"]
 def get_word_from_index(index, tokenizer):
     return next((word for word, idx in tokenizer.word_index.items() if idx == index), None)
 
-def predict_caption(model, image_features, tokenizer, max_caption_length):
-    caption = "startseq"
+def greedy_generator(image_features):
+    in_text = 'start '
     for _ in range(max_caption_length):
-        sequence = tokenizer.texts_to_sequences([caption])[0]
-        sequence = pad_sequences([sequence], maxlen=max_caption_length)
-        yhat = model.predict([image_features, sequence], verbose=0)
-        predicted_index = np.argmax(yhat)
-        predicted_word = get_word_from_index(predicted_index, tokenizer)
-        if predicted_word is None:
+        sequence = tokenizer.texts_to_sequences([in_text])[0]
+        sequence = pad_sequences([sequence], maxlen=max_caption_length).reshape((1, max_caption_length))
+        prediction = model.predict([image_features.reshape(1, cnn_output_dim), sequence], verbose=0)
+        idx = np.argmax(prediction)
+        word = tokenizer.index_word.get(idx)
+        if word is None:
             break
-        caption += " " + predicted_word
-        if predicted_word == "endseq":
+        in_text += ' ' + word
+        if word == 'end':
             break
-    return caption.replace("startseq", "").replace("endseq", "").strip()
+    return in_text.replace('start ', '').replace(' end', '')
+
 
 # Process uploaded image
 if uploaded_image is not None:
@@ -58,17 +61,15 @@ if uploaded_image is not None:
 
     st.subheader("Generated Caption")
     with st.spinner("Generating caption..."):
-        # Load and preprocess image using PIL
+        # Preprocess uploaded image
         image = Image.open(uploaded_image).resize((299, 299)).convert('RGB')
         image = img_to_array(image)
         image = np.expand_dims(image, axis=0)
         image = preprocess_input(image)
 
-        # Extract features using InceptionV3
+        # Extract image features
         image_features = inception_model.predict(image, verbose=0)
 
-
         # Generate caption
-        generated_caption = predict_caption(model, image_features, tokenizer, max_caption_length)
-
+        generated_caption = greedy_generator(image_features)
         st.markdown(f"**{generated_caption}**")
