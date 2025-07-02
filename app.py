@@ -7,11 +7,16 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.applications.inception_v3 import InceptionV3, preprocess_input
 from tensorflow.keras.preprocessing.image import img_to_array
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.layers import GlobalAveragePooling2D
+from tensorflow.keras import Input
 
 
-# Load InceptionV3 model pre-trained on ImageNet, exclude top classification layer
-inception_model = InceptionV3(weights='imagenet', include_top=False, input_shape=(299, 299, 3))
-inception_model = Model(inputs=inception_model, outputs=tf.keras.layers.GlobalAveragePooling2D()(inception_model.output))
+# Load InceptionV3 base model without top
+base_model = InceptionV3(weights='imagenet', include_top=False, input_shape=(299, 299, 3))
+
+# Add GlobalAveragePooling2D layer on top
+x = GlobalAveragePooling2D()(base_model.output)
+inception_model = Model(inputs=base_model.input, outputs=x)
 
 cnn_output_dim = 2048
 
